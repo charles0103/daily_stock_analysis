@@ -34,6 +34,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [修复] Docker 挂载的 `logs` 目录不可写时启动日志自动降级到控制台输出，并补充非 root 容器目录权限说明。
 - [修复] 修正分析报告 API 构建策略点位时数值字段未归一为字符串的问题，避免策略价格触发响应 DTO 类型校验失败。
 - [修复] Docker 启动入口自动修复 `data` / `logs` / `reports` 挂载目录权限并降权运行，文档化的 Compose `exec` 手动命令显式使用 `dsa` 用户，避免普通部署需要手动 `chown` / `chmod`。
+- [改进] 将所有 LLM 分析提示語中的「使用中文」改為「使用繁體中文（正體中文）」，涵蓋 `src/analyzer.py`、`src/market_analyzer.py`、`src/agent/agents/decision_agent.py`、`src/agent/executor.py`，報告輸出語言改為繁體中文。
+- [文档] 將 `CLAUDE.md` 從 symlink（filemode 120000）轉換為普通檔案（100644），補充完整的專案架構說明、常用指令與高風險區域說明，修復 GitHub Actions 在 Linux 環境 checkout 時因 symlink 目標路徑過長導致 `File name too long` 的錯誤。
 
 ## [3.16.0] - 2026-05-10
 
