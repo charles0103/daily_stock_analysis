@@ -1800,7 +1800,7 @@ class GeminiAnalyzer:
 
 - 所有 JSON 键名保持不变。
 - `decision_type` 必须保持为 `buy|hold|sell`。
-- 所有面向用户的人类可读文本值必须使用中文。
+- 所有面向用户的人类可读文本值必须使用繁體中文（正體中文）。
 """
 
     def _has_channel_config(self, config: Config) -> bool:
@@ -2777,8 +2777,8 @@ class GeminiAnalyzer:
 ### 输出语言要求（最高优先级）
 - 所有 JSON 键名必须保持不变，不要翻译键名。
 - `decision_type` 必须保持为 `buy`、`hold`、`sell`。
-- 所有面向用户的人类可读文本值必须使用中文。
-- 当数据缺失时，请使用中文直接说明“{no_data_text}，无法判断”。
+- 所有面向用户的人类可读文本值必须使用繁體中文（正體中文）。
+- 当数据缺失时，请使用繁體中文直接说明”{no_data_text}，無法判斷”。
 """
         
         return prompt

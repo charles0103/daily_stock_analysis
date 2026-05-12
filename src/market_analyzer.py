@@ -999,8 +999,8 @@ Lagging: {bottom_sectors_text if bottom_sectors_text else "N/A"}"""
 Output the report content directly, no extra commentary.
 """
 
-        # A 股场景使用中文提示语
-        return f"""你是一位专业的A/H/美股市场分析师，请根据以下数据生成一份结构化的{self._get_market_scope_name('zh')}大盘复盘报告。
+        # A 股场景使用繁體中文提示語
+        return f"""你是一位專業的A/H/美股市場分析師，請根據以下數據生成一份結構化的{self._get_market_scope_name('zh')}大盤複盤報告，所有輸出內容請使用繁體中文（正體中文）。
 
 【重要】输出要求：
 - 必须输出纯 Markdown 文本格式

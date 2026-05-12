@@ -414,8 +414,8 @@ def _build_language_section(report_language: str, *, chat_mode: bool = False) ->
         return """
 ## 输出语言
 
-- 默认使用中文回答。
-- 若输出 JSON，键名保持不变，所有面向用户的文本值使用中文。
+- 請使用繁體中文（正體中文）回答。
+- 若输出 JSON，键名保持不变，所有面向用户的文本值使用繁體中文。
 """
 
     if normalized == "en":
@@ -433,7 +433,7 @@ def _build_language_section(report_language: str, *, chat_mode: bool = False) ->
 
 - 所有 JSON 键名保持不变。
 - `decision_type` 必须保持为 `buy|hold|sell`。
-- 所有面向用户的人类可读文本值必须使用中文。
+- 所有面向用户的人类可读文本值必须使用繁體中文（正體中文）。
 """
 
 
@@ -660,7 +660,7 @@ class AgentExecutor:
             if report_language == "en":
                 parts.append("输出语言: English（所有 JSON 键名保持不变，所有面向用户的文本值使用英文）")
             else:
-                parts.append("输出语言: 中文（所有 JSON 键名保持不变，所有面向用户的文本值使用中文）")
+                parts.append("输出语言: 繁體中文（所有 JSON 键名保持不变，所有面向用户的文本值使用繁體中文）")
 
             # Inject pre-fetched context data to avoid redundant fetches
             if context.get("realtime_quote"):
