@@ -80,6 +80,9 @@ verify_*.py
 !.claude/skills/
 !.claude/skills/**
 
+# Serena MCP local project config (machine-specific, not for repo)
+.serena/
+
 # ignore static files
 static/
 /apps/dsa-desktop/dist/
