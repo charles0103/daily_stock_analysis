@@ -35,6 +35,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [修复] 修正分析报告 API 构建策略点位时数值字段未归一为字符串的问题，避免策略价格触发响应 DTO 类型校验失败。
 - [修复] Docker 启动入口自动修复 `data` / `logs` / `reports` 挂载目录权限并降权运行，文档化的 Compose `exec` 手动命令显式使用 `dsa` 用户，避免普通部署需要手动 `chown` / `chmod`。
 - [改进] 将所有 LLM 分析提示語中的「使用中文」改為「使用繁體中文（正體中文）」，涵蓋 `src/analyzer.py`、`src/market_analyzer.py`、`src/agent/agents/decision_agent.py`、`src/agent/executor.py`，報告輸出語言改為繁體中文。
+- [修复] 将 `src/report_language.py` 的 `zh` 語系所有硬編碼標籤、翻譯字典與 fallback 字串由簡體中文改為繁體中文（涵蓋 `_REPORT_LABELS`、`_OPERATION_ADVICE_TRANSLATIONS`、`_TREND_PREDICTION_TRANSLATIONS`、`_BIAS_STATUS_TRANSLATIONS`、情緒標籤等），並同步更新 `src/analyzer.py` 中的 fallback 趨勢預測、錯誤訊息與 guard 函數建議文字，解決 Discord 等通知渠道顯示簡體中文的問題。
+- [修复] 在操作建議與趨勢預測的 canonical map 新增繁體中文別名（強烈買入、多頭排列、震盪等），確保 LLM 輸出繁體時仍能正確識別並分類。
+- [chore] 更正 `.github/workflows/daily_analysis.yml` cron 排程的過時注釋（UTC 00:00 = 台灣時間 08:00）。
 - [文档] 將 `CLAUDE.md` 從 symlink（filemode 120000）轉換為普通檔案（100644），補充完整的專案架構說明、常用指令與高風險區域說明，修復 GitHub Actions 在 Linux 環境 checkout 時因 symlink 目標路徑過長導致 `File name too long` 的錯誤。
 
 ## [3.16.0] - 2026-05-10
