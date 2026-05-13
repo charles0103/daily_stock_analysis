@@ -2049,6 +2049,7 @@ class GeminiAnalyzer:
             try:
                 model_short = model.split("/")[-1] if "/" in model else model
                 extra = get_thinking_extra_body(model_short)
+                _llm_timeout = getattr(config, "llm_request_timeout", 120)
                 call_kwargs: Dict[str, Any] = {
                     "model": model,
                     "messages": [
@@ -2062,6 +2063,7 @@ class GeminiAnalyzer:
                         request_overrides={"extra_body": extra} if extra else None,
                     ),
                     "max_tokens": max_tokens,
+                    **({"timeout": _llm_timeout} if _llm_timeout > 0 else {}),
                 }
                 if extra:
                     call_kwargs["extra_body"] = extra

@@ -57,6 +57,11 @@ class DiscordSender:
         except ValueError as e:
             logger.error(f"分割 Discord 消息失败: {e}, 尝试整段发送。")
             chunks = [content]
+        # 過濾空塊，避免 Discord 400 "Cannot send an empty message"
+        chunks = [c for c in chunks if c.strip()]
+        if not chunks:
+            logger.warning("Discord 消息内容为空，跳过推送")
+            return False
 
         # 优先使用 Webhook（配置简单，权限低）
         if self._discord_config['webhook_url']:

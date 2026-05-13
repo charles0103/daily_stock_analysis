@@ -850,6 +850,8 @@ class Config:
     stock_market_filter: str = ""
     # 交易日检查：默认启用，非交易日跳过执行；设为 false 或 --force-run 可强制执行（Issue #373）
     trading_day_check_enabled: bool = True
+    # LLM 單次請求逾時秒數（0 = 不限制）；預設 120 秒，避免模型回應異常時無限等待
+    llm_request_timeout: int = 120
 
     # === 实时行情增强数据配置 ===
     # 实时行情开关（关闭后使用历史收盘价进行分析）
@@ -1601,6 +1603,7 @@ class Config:
                 os.getenv('STOCK_MARKET_FILTER', '')
             ),
             trading_day_check_enabled=os.getenv('TRADING_DAY_CHECK_ENABLED', 'true').lower() != 'false',
+            llm_request_timeout=parse_env_int(os.getenv('LLM_REQUEST_TIMEOUT'), 120, field_name='LLM_REQUEST_TIMEOUT', minimum=0),
             webui_enabled=os.getenv('WEBUI_ENABLED', 'false').lower() == 'true',
             webui_host=os.getenv('WEBUI_HOST', '127.0.0.1'),
             webui_port=parse_env_int(os.getenv('WEBUI_PORT'), 8000, field_name='WEBUI_PORT', minimum=1, maximum=65535),
