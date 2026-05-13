@@ -1716,7 +1716,20 @@ class StockAnalysisPipeline:
         if not stock_codes:
             logger.error("未配置自选股列表，请在 .env 文件中设置 STOCK_LIST")
             return []
-        
+
+        # 按市场过滤（STOCK_MARKET_FILTER=us/cn/hk 时只保留对应市场）
+        market_filter = getattr(self.config, 'stock_market_filter', '')
+        if market_filter:
+            from src.market_context import detect_market
+            original_count = len(stock_codes)
+            stock_codes = [c for c in stock_codes if detect_market(c) == market_filter]
+            skipped = original_count - len(stock_codes)
+            if skipped:
+                logger.info(f"[市场过滤] STOCK_MARKET_FILTER={market_filter}，已跳过 {skipped} 支非{market_filter}股票")
+            if not stock_codes:
+                logger.warning(f"[市场过滤] 过滤后无可分析股票，请检查 STOCK_LIST 与 STOCK_MARKET_FILTER 设置")
+                return []
+
         logger.info(f"===== 开始分析 {len(stock_codes)} 只股票 =====")
         logger.info(f"股票列表: {', '.join(stock_codes)}")
         logger.info(f"并发数: {self.max_workers}, 模式: {'仅获取数据' if dry_run else '完整分析'}")

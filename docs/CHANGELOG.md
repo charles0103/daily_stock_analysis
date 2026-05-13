@@ -38,6 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [修复] 将 `src/report_language.py` 的 `zh` 語系所有硬編碼標籤、翻譯字典與 fallback 字串由簡體中文改為繁體中文（涵蓋 `_REPORT_LABELS`、`_OPERATION_ADVICE_TRANSLATIONS`、`_TREND_PREDICTION_TRANSLATIONS`、`_BIAS_STATUS_TRANSLATIONS`、情緒標籤等），並同步更新 `src/analyzer.py` 中的 fallback 趨勢預測、錯誤訊息與 guard 函數建議文字，解決 Discord 等通知渠道顯示簡體中文的問題。
 - [修复] 在操作建議與趨勢預測的 canonical map 新增繁體中文別名（強烈買入、多頭排列、震盪等），確保 LLM 輸出繁體時仍能正確識別並分類。
 - [chore] 更正 `.github/workflows/daily_analysis.yml` cron 排程的過時注釋（UTC 00:00 = 台灣時間 08:00）。
+- [新功能] 新增 `STOCK_MARKET_FILTER` 環境變數（`us` / `cn` / `hk` / 留空），pipeline 在分析前自動過濾不符合市場的股票代碼，無需修改 `STOCK_LIST`；workflow 與大盤復盤預設值同步改為 `us`。
 - [文档] 將 `CLAUDE.md` 從 symlink（filemode 120000）轉換為普通檔案（100644），補充完整的專案架構說明、常用指令與高風險區域說明，修復 GitHub Actions 在 Linux 環境 checkout 時因 symlink 目標路徑過長導致 `File name too long` 的錯誤。
 
 ## [3.16.0] - 2026-05-10

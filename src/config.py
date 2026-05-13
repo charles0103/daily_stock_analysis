@@ -846,6 +846,8 @@ class Config:
     market_review_enabled: bool = True        # 是否启用大盘复盘
     # 大盘复盘市场区域：cn(A股)、us(美股)、both(两者)，us 适合仅关注美股的用户
     market_review_region: str = "cn"
+    # 股票市场过滤：留空=全部，us=仅美股，cn=仅A股，hk=仅港股
+    stock_market_filter: str = ""
     # 交易日检查：默认启用，非交易日跳过执行；设为 false 或 --force-run 可强制执行（Issue #373）
     trading_day_check_enabled: bool = True
 
@@ -1595,6 +1597,9 @@ class Config:
             market_review_region=cls._parse_market_review_region(
                 os.getenv('MARKET_REVIEW_REGION', 'cn')
             ),
+            stock_market_filter=cls._parse_stock_market_filter(
+                os.getenv('STOCK_MARKET_FILTER', '')
+            ),
             trading_day_check_enabled=os.getenv('TRADING_DAY_CHECK_ENABLED', 'true').lower() != 'false',
             webui_enabled=os.getenv('WEBUI_ENABLED', 'false').lower() == 'true',
             webui_host=os.getenv('WEBUI_HOST', '127.0.0.1'),
@@ -2142,6 +2147,18 @@ class Config:
             f"MARKET_REVIEW_REGION 配置值 '{value}' 无效，已回退为默认值 'cn'（合法值：cn / hk / us / both）"
         )
         return 'cn'
+
+    @classmethod
+    def _parse_stock_market_filter(cls, value: str) -> str:
+        """解析股票市场过滤器，非法值记录警告后回退为空（不过滤）"""
+        import logging
+        v = (value or '').strip().lower()
+        if v in ('', 'cn', 'us', 'hk'):
+            return v
+        logging.getLogger(__name__).warning(
+            f"STOCK_MARKET_FILTER 配置值 '{value}' 无效，已回退为空（不过滤）（合法值：留空 / cn / hk / us）"
+        )
+        return ''
 
     @classmethod
     def _parse_md2img_engine(cls, value: str) -> str:
