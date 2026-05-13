@@ -2153,10 +2153,10 @@ class Config:
         """解析股票市场过滤器，非法值记录警告后回退为空（不过滤）"""
         import logging
         v = (value or '').strip().lower()
-        if v in ('', 'cn', 'us', 'hk'):
+        if v in ('', 'cn', 'us', 'hk', 'tw'):
             return v
         logging.getLogger(__name__).warning(
-            f"STOCK_MARKET_FILTER 配置值 '{value}' 无效，已回退为空（不过滤）（合法值：留空 / cn / hk / us）"
+            f"STOCK_MARKET_FILTER 配置值 '{value}' 无效，已回退为空（不过滤）（合法值：留空 / cn / hk / us / tw）"
         )
         return ''
 

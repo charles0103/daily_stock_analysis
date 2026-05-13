@@ -87,9 +87,10 @@ class YfinanceFetcher(BaseFetcher):
         - A股深市：000001.SZ (Shenzhen Stock Exchange)
         - 港股：0700.HK (Hong Kong Stock Exchange)
         - 美股：AAPL, TSLA, GOOGL (无需后缀)
+        - 台股：2330.TW (台湾证交所 TWSE)
 
         Args:
-            stock_code: 原始代码，如 '600519', 'hk00700', 'AAPL'
+            stock_code: 原始代码，如 '600519', 'hk00700', 'AAPL', 'TW2330'
 
         Returns:
             Yahoo Finance 格式代码
@@ -101,6 +102,8 @@ class YfinanceFetcher(BaseFetcher):
             '0700.HK'
             >>> fetcher._convert_stock_code('AAPL')
             'AAPL'
+            >>> fetcher._convert_stock_code('TW2330')
+            '2330.TW'
         """
         code = stock_code.strip().upper()
 
@@ -114,6 +117,15 @@ class YfinanceFetcher(BaseFetcher):
         if is_us_stock_code(code):
             logger.debug(f"识别为美股代码: {code}")
             return code
+
+        # 台股：TW前缀 -> .TW後綴（Yahoo Finance 格式）
+        # 正規化後的台股代碼形式為 TW2330，轉換為 2330.TW
+        if code.startswith('TW') and not code.startswith('TW.'):
+            tw_digits = code[2:]
+            if tw_digits.isdigit() and 1 <= len(tw_digits) <= 4:
+                tw_code = tw_digits.lstrip('0') or '0'
+                logger.debug(f"轉換台股代碼: {stock_code} -> {tw_code}.TW")
+                return f"{tw_code}.TW"
 
         # 港股：hk前缀 -> .HK后缀
         if code.startswith('HK'):
@@ -652,18 +664,19 @@ class YfinanceFetcher(BaseFetcher):
 
     def get_realtime_quote(self, stock_code: str) -> Optional[UnifiedRealtimeQuote]:
         """
-        获取美股/美股指数实时行情数据
+        获取美股/美股指数/台股实时行情数据
 
-        支持美股股票（AAPL、TSLA）和美股指数（SPX、DJI 等）。
-        数据来源：yfinance Ticker.info
+        支持美股股票（AAPL、TSLA）、美股指数（SPX、DJI 等）及台股（TW2330）。
+        数据来源：yfinance Ticker.info / history
 
         Args:
-            stock_code: 美股代码或指数代码，如 'AMD', 'AAPL', 'SPX', 'DJI'
+            stock_code: 代码，如 'AMD', 'AAPL', 'SPX', 'DJI', 'TW2330'
 
         Returns:
             UnifiedRealtimeQuote 对象，获取失败返回 None
         """
         import yfinance as yf
+        from data_provider.base import _is_tw_market
 
         # 美股指数：使用映射（SPX -> ^GSPC）
         yf_symbol, index_name = get_us_index_yf_symbol(stock_code)
@@ -673,6 +686,10 @@ class YfinanceFetcher(BaseFetcher):
                 yf_symbol=yf_symbol,
                 index_name=index_name,
             )
+
+        # 台股：轉換為 yfinance 格式後取行情
+        if _is_tw_market(stock_code):
+            return self._get_tw_stock_realtime_quote(stock_code)
 
         # 仅处理美股股票
         if not self._is_us_stock(stock_code):
@@ -765,6 +782,63 @@ class YfinanceFetcher(BaseFetcher):
         except Exception as e:
             logger.warning(f"[Yfinance] 获取美股 {stock_code} 实时行情失败: {e}，尝试 Stooq 兜底")
             return self._get_us_stock_quote_from_stooq(stock_code)
+
+    def _get_tw_stock_realtime_quote(self, stock_code: str) -> Optional[UnifiedRealtimeQuote]:
+        """取得台股即時報價（透過 yfinance，使用 .TW 後綴）。"""
+        import yfinance as yf
+
+        yf_symbol = self._convert_stock_code(stock_code)
+        try:
+            ticker = yf.Ticker(yf_symbol)
+            hist = ticker.history(period="2d")
+            if hist.empty:
+                logger.warning(f"[Yfinance] 台股 {stock_code} ({yf_symbol}) 無數據")
+                return None
+
+            today = hist.iloc[-1]
+            prev = hist.iloc[-2] if len(hist) > 1 else today
+            price = float(today["Close"])
+            prev_close = float(prev["Close"])
+            change_amount = price - prev_close
+            change_pct = (change_amount / prev_close * 100) if prev_close > 0 else None
+            amplitude = None
+            high = float(today["High"])
+            low = float(today["Low"])
+            if prev_close > 0:
+                amplitude = (high - low) / prev_close * 100
+
+            try:
+                info = ticker.info
+                name = info.get("shortName") or info.get("longName") or ""
+            except Exception:
+                name = ""
+
+            quote = UnifiedRealtimeQuote(
+                code=stock_code,
+                name=name,
+                source=RealtimeSource.FALLBACK,
+                price=price,
+                change_pct=round(change_pct, 2) if change_pct is not None else None,
+                change_amount=round(change_amount, 4),
+                volume=int(today["Volume"]),
+                amount=None,
+                volume_ratio=None,
+                turnover_rate=None,
+                amplitude=round(amplitude, 2) if amplitude is not None else None,
+                open_price=float(today["Open"]),
+                high=high,
+                low=low,
+                pre_close=prev_close,
+                pe_ratio=None,
+                pb_ratio=None,
+                total_mv=None,
+                circ_mv=None,
+            )
+            logger.info(f"[Yfinance] 台股 {stock_code} 報價成功: {price}")
+            return quote
+        except Exception as e:
+            logger.warning(f"[Yfinance] 台股 {stock_code} ({yf_symbol}) 報價失敗: {e}")
+            return None
 
 
 if __name__ == "__main__":

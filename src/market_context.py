@@ -17,12 +17,28 @@ def detect_market(stock_code: Optional[str]) -> str:
     """Detect market from stock code.
 
     Returns:
-        One of 'cn', 'hk', 'us', or 'cn' as fallback.
+        One of 'cn', 'hk', 'us', 'tw', or 'cn' as fallback.
     """
     if not stock_code:
         return "cn"
 
     code = stock_code.strip().upper()
+
+    # TW stocks: TW2330, 2330.TW, 6488.TWO, or 4-digit pure numbers
+    if code.startswith("TW") and not code.startswith("TW."):
+        digits = code[2:]
+        if digits.isdigit() and 1 <= len(digits) <= 4:
+            return "tw"
+    if code.endswith(".TWO"):
+        base = code[:-4]
+        if base.isdigit() and 1 <= len(base) <= 4:
+            return "tw"
+    if code.endswith(".TW"):
+        base = code[:-3]
+        if base.isdigit() and 1 <= len(base) <= 4:
+            return "tw"
+    if code.isdigit() and len(code) == 4:
+        return "tw"
 
     # HK stocks: HK00700, 00700.HK, or 5-digit pure numbers
     if code.startswith("HK") or code.endswith(".HK"):
@@ -58,6 +74,10 @@ _MARKET_ROLES = {
         "zh": "美股",
         "en": "US stock",
     },
+    "tw": {
+        "zh": "台股",
+        "en": "Taiwan stock",
+    },
 }
 
 _MARKET_GUIDELINES = {
@@ -89,6 +109,16 @@ _MARKET_GUIDELINES = {
         "en": (
             "- This analysis covers a **US stock** (listed on NYSE/NASDAQ).\n"
             "- US stocks have no daily price limits (but have circuit breakers), allow T+0 and pre/after-market trading. Consider USD FX, Fed policy, and SEC regulations."
+        ),
+    },
+    "tw": {
+        "zh": (
+            "- 本次分析對象為 **台股**（台灣證券交易所或櫃買中心上市股票）。\n"
+            "- 台股有漲跌停限制（±10%），採 T+2 交割制度，需關注台幣匯率、外資動向、半導體產業鏈動態及 Fed/央行政策影響。"
+        ),
+        "en": (
+            "- This analysis covers a **Taiwan stock** (listed on TWSE or TPEx).\n"
+            "- Taiwan stocks have daily price limits (±10%), T+2 settlement. Consider TWD FX, foreign investor flows, semiconductor supply chain, and Fed/CBC policy impact."
         ),
     },
 }

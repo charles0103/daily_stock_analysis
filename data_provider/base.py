@@ -79,12 +79,21 @@ def normalize_stock_code(stock_code: str) -> str:
     - 'HK00700'     -> 'HK00700'  (keep HK prefix for HK stocks)
     - '1810.HK'     -> 'HK01810'  (normalize HK suffix to canonical prefix form)
     - 'AAPL'        -> 'AAPL'     (keep US stock ticker as-is)
+    - 'TW2330'      -> 'TW2330'   (keep TW prefix for Taiwan stocks)
+    - '2330.TW'     -> 'TW2330'   (normalize .TW suffix to canonical prefix form)
+    - '6488.TWO'    -> 'TW6488'   (normalize .TWO suffix to canonical prefix form)
 
     This function is applied at the DataProviderManager layer so that
     all individual fetchers receive a clean 6-digit code (for A-shares/ETFs).
     """
     code = stock_code.strip()
     upper = code.upper()
+
+    # Normalize TW prefix to canonical form (e.g. tw2330 -> TW2330)
+    if upper.startswith('TW') and not upper.startswith('TW.'):
+        candidate = upper[2:]
+        if candidate.isdigit() and 1 <= len(candidate) <= 4:
+            return f"TW{candidate.zfill(4)}"
 
     # Normalize HK prefix to a canonical 5-digit form (e.g. hk1810 -> HK01810)
     if upper.startswith('HK') and not upper.startswith('HK.'):
@@ -106,10 +115,13 @@ def normalize_stock_code(stock_code: str) -> str:
             return candidate
 
     # Strip .SH/.SZ/.BJ suffix (e.g. 600519.SH -> 600519, 920748.BJ -> 920748)
+    # Also normalize .TW/.TWO suffix to canonical TW prefix form
     if '.' in code:
         base, suffix = code.rsplit('.', 1)
         if suffix.upper() == 'HK' and base.isdigit() and 1 <= len(base) <= 5:
             return f"HK{base.zfill(5)}"
+        if suffix.upper() in ('TW', 'TWO') and base.isdigit() and 1 <= len(base) <= 4:
+            return f"TW{base.zfill(4)}"
         if suffix.upper() in ('SH', 'SZ', 'SS', 'BJ') and base.isdigit():
             return base
 
@@ -145,6 +157,28 @@ def _is_hk_market(code: str) -> bool:
     return False
 
 
+def _is_tw_market(code: str) -> bool:
+    """
+    判定是否為台股代碼（台灣證交所 TWSE / 櫃買 TPEx）。
+
+    支持 `TW2330`、`2330.TW`、`6488.TWO` 及純 4 位數字形式。
+    台股代碼為 4 位數字，不與 A 股（6 位）、港股（5 位）重疊。
+    """
+    normalized = (code or "").strip().upper()
+    if normalized.startswith("TW") and not normalized.startswith("TW."):
+        digits = normalized[2:]
+        return digits.isdigit() and 1 <= len(digits) <= 4
+    if normalized.endswith(".TWO"):
+        base = normalized[:-4]
+        return base.isdigit() and 1 <= len(base) <= 4
+    if normalized.endswith(".TW"):
+        base = normalized[:-3]
+        return base.isdigit() and 1 <= len(base) <= 4
+    if normalized.isdigit() and len(normalized) == 4:
+        return True
+    return False
+
+
 def _is_etf_code(code: str) -> bool:
     """判定 A 股 ETF 基金代码（保守规则）。"""
     normalized = normalize_stock_code(code)
@@ -156,11 +190,13 @@ def _is_etf_code(code: str) -> bool:
 
 
 def _market_tag(code: str) -> str:
-    """返回市场标签: cn/us/hk."""
+    """返回市场标签: cn/us/hk/tw."""
     if _is_us_market(code):
         return "us"
     if _is_hk_market(code):
         return "hk"
+    if _is_tw_market(code):
+        return "tw"
     return "cn"
 
 
@@ -489,7 +525,7 @@ class DataFetcherManager:
         "TushareFetcher": {"cn", "hk"},
         "PytdxFetcher": {"cn"},
         "BaostockFetcher": {"cn"},
-        "YfinanceFetcher": {"cn", "hk", "us"},
+        "YfinanceFetcher": {"cn", "hk", "us", "tw"},
         "LongbridgeFetcher": {"hk", "us"},
     }
     
@@ -612,7 +648,7 @@ class DataFetcherManager:
         market: str,
     ) -> List[BaseFetcher]:
         """Skip built-in daily fetchers that are known not to support a market."""
-        if market not in {"cn", "hk", "us"}:
+        if market not in {"cn", "hk", "us", "tw"}:
             return fetchers
 
         kept: List[BaseFetcher] = []
