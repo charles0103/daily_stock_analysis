@@ -336,8 +336,8 @@ jobs:
           # ==========================================
           STOCK_LIST: ${{ vars.STOCK_LIST || secrets.STOCK_LIST || '600519' }}
           MARKET_REVIEW_REGION: ${{ vars.MARKET_REVIEW_REGION || secrets.MARKET_REVIEW_REGION || 'us' }}
-          # 股票市場過濾：留空=全部，us=僅美股，cn=僅A股，hk=僅港股
-          STOCK_MARKET_FILTER: ${{ vars.STOCK_MARKET_FILTER || secrets.STOCK_MARKET_FILTER || 'us' }}
+          # 股票市場過濾：留空=全部，us=僅美股，cn=僅A股，hk=僅港股，tw=僅台股
+          STOCK_MARKET_FILTER: ${{ vars.STOCK_MARKET_FILTER || secrets.STOCK_MARKET_FILTER || '' }}
           
           # ==========================================
           # 运行配置 ⬅️ 新增！

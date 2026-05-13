@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 <!-- 新条目格式：- [类型] 描述（类型取值：新功能/改进/修复/文档/测试/chore）-->
 <!-- 每条独立一行追加到本段末尾，无需分类标题，合并时冲突最小 -->
+- [修复] `daily_analysis.yml` 的 `STOCK_MARKET_FILTER` 預設值從 `'us'` 改為空字串，避免未設定 GitHub Variable 時台股（tw）等非美股被自動過濾。
 - [新功能] 新增台灣股市（TWSE/TPEx）支援：代碼正規化（`2330.TW` → `TW2330`）、yfinance 代碼轉換（`TW2330` → `2330.TW`）、交易日曆（XTAI / Asia/Taipei）、市場過濾器加入 `tw` 合法值，以及台股專屬 LLM 分析框架（±10% 漲跌停、T+2 交割、外資動向）。詳見 [changelogs/2026-05/05-13-taiwan-stock-support.md](../changelogs/2026-05/05-13-taiwan-stock-support.md)。
 - [修复] 未配置 Tushare / Longbridge 凭据时不再实例化对应可选 fetcher，避免缺失凭据的数据源进入候选集。
 - [修复] Longbridge 遇到连接关闭类异常后会进入冷却期，并在美股/港股实时与日线请求中临时跳过该数据源，避免请求级频繁重连。
