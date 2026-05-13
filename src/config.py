@@ -2283,6 +2283,21 @@ class Config:
             for c in stock_list_str.split(',')
             if (c or "").strip()
         ]
+        # 保序去重，避免 STOCK_LIST 重複代碼被分析兩次
+        seen: set = set()
+        deduped = []
+        for code in stock_list:
+            if code not in seen:
+                seen.add(code)
+                deduped.append(code)
+        if len(deduped) < len(stock_list):
+            duplicates = [c for c in stock_list if stock_list.count(c) > 1]
+            import logging as _log
+            _log.getLogger(__name__).warning(
+                "STOCK_LIST 含重複代碼，已自動去重: %s",
+                ", ".join(dict.fromkeys(duplicates)),
+            )
+        stock_list = deduped
 
         if not stock_list:
             stock_list = ['000001']

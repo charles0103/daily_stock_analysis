@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 <!-- 新条目格式：- [类型] 描述（类型取值：新功能/改进/修复/文档/测试/chore）-->
 <!-- 每条独立一行追加到本段末尾，无需分类标题，合并时冲突最小 -->
 - [修复] `daily_analysis.yml` 的 `STOCK_MARKET_FILTER` 預設值從 `'us'` 改為空字串，避免未設定 GitHub Variable 時台股（tw）等非美股被自動過濾。
+- [修复] 台股（TW 前綴）資料抓取路由：`data_provider/base.py` 加入 `is_tw` 判斷，直接路由至 YfinanceFetcher，不再誤試 Pytdx/Baostock 等 A 股資料源。
+- [修复] `STOCK_LIST` 重複代碼保序去重，重複代碼僅分析一次並記錄 WARNING。
 - [修复] LLM 單次請求加入可設定逾時（預設 120 秒，環境變數 `LLM_REQUEST_TIMEOUT`），防止 MiniMax 等模型回應異常時無限等待導致分析結果遺漏。
 - [修复] Discord Webhook 推送前過濾空白訊息塊，避免 `chunk_content_by_max_words` 產生空塊時觸發 400 "Cannot send an empty message" 錯誤。
 - [新功能] 新增台灣股市（TWSE/TPEx）支援：代碼正規化（`2330.TW` → `TW2330`）、yfinance 代碼轉換（`TW2330` → `2330.TW`）、交易日曆（XTAI / Asia/Taipei）、市場過濾器加入 `tw` 合法值，以及台股專屬 LLM 分析框架（±10% 漲跌停、T+2 交割、外資動向）。詳見 [changelogs/2026-05/05-13-taiwan-stock-support.md](../changelogs/2026-05/05-13-taiwan-stock-support.md)。

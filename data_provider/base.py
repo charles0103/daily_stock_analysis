@@ -1102,22 +1102,63 @@ class DataFetcherManager:
         errors = []
         request_start = time.time()
 
-        # 快速路径：美股使用专用数据源路由；港股先过滤不支持港股日线的数据源
+        # 快速路径：美股使用专用数据源路由；港股/台股先过滤不支持对应市场日线的数据源
         #   - 配置长桥凭据后: Longbridge 为首选, YFinance/AkShare 兜底
-        #   - 未配置长桥:     YFinance 为首选（美股）, 通用 fetcher 循环（港股）
+        #   - 未配置长桥:     YFinance 为首选（美股/台股）, 通用 fetcher 循环（港股）
         #   - 美股指数:       始终 YFinance 为首选（Longbridge 不提供指数K线）
         is_us_index = is_us_index_code(stock_code)
         is_us = is_us_index or is_us_stock_code(stock_code)
         is_hk = (not is_us) and _is_hk_market(stock_code)
+        is_tw = (not is_us) and (not is_hk) and _is_tw_market(stock_code)
         if is_hk:
             fetchers = self._filter_daily_fetchers_for_market(fetchers, "hk")
+        elif is_tw:
+            fetchers = self._filter_daily_fetchers_for_market(fetchers, "tw")
         fetchers = self._filter_fetchers_by_capability(fetchers, capability="daily_data")
         total_fetchers = len(fetchers)
 
         if total_fetchers == 0:
-            market_label = "美股指数" if is_us_index else "美股" if is_us else "港股" if is_hk else "A股"
+            market_label = "美股指数" if is_us_index else "美股" if is_us else "港股" if is_hk else "台股" if is_tw else "A股"
             error_summary = f"{market_label} {stock_code} 获取失败:\n暂无可用数据源"
             logger.error(f"[数据源终止] {stock_code} 获取失败: {error_summary}")
+            raise DataFetchError(error_summary)
+
+        # 台股：YFinance 為唯一支援的資料源，直接路由
+        if is_tw:
+            for attempt, fetcher in enumerate(fetchers, start=1):
+                if fetcher.name != "YfinanceFetcher":
+                    continue
+                try:
+                    logger.info(
+                        f"[数据源尝试 {attempt}/{total_fetchers}] [{fetcher.name}] "
+                        f"台股 {stock_code} 首选路由..."
+                    )
+                    df = self._call_fetcher_method(
+                        fetcher,
+                        "get_daily_data",
+                        stock_code=stock_code,
+                        start_date=start_date,
+                        end_date=end_date,
+                        days=days,
+                    )
+                    if df is not None and not df.empty:
+                        elapsed = time.time() - request_start
+                        logger.info(
+                            f"[数据源完成] {stock_code} 使用 [{fetcher.name}] 获取成功: "
+                            f"rows={len(df)}, elapsed={elapsed:.2f}s"
+                        )
+                        return df, fetcher.name
+                except Exception as e:
+                    error_type, error_reason = summarize_exception(e)
+                    errors.append(f"[{fetcher.name}] ({error_type}) {error_reason}")
+                    logger.warning(
+                        f"[数据源失败 {attempt}/{total_fetchers}] [{fetcher.name}] {stock_code}: "
+                        f"error_type={error_type}, reason={error_reason}"
+                    )
+                break
+            error_summary = f"台股 {stock_code} 获取失败:\n" + "\n".join(errors)
+            elapsed = time.time() - request_start
+            logger.error(f"[数据源终止] {stock_code} 获取失败: elapsed={elapsed:.2f}s\n{error_summary}")
             raise DataFetchError(error_summary)
 
         # 美股（含美股指数）使用 Longbridge/YFinance 特殊路由；港股走下方通用数据源循环
