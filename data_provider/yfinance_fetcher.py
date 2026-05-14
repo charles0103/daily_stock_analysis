@@ -840,6 +840,20 @@ class YfinanceFetcher(BaseFetcher):
             logger.warning(f"[Yfinance] 台股 {stock_code} ({yf_symbol}) 報價失敗: {e}")
             return None
 
+    def get_stock_name(self, stock_code: str) -> Optional[str]:
+        """获取台股/美股名称（via yfinance ticker.info）。"""
+        from data_provider.base import _is_tw_market
+        if not (_is_tw_market(stock_code) or self._is_us_stock(stock_code)):
+            return None
+        import yfinance as yf
+        yf_symbol = self._convert_stock_code(stock_code)
+        try:
+            info = yf.Ticker(yf_symbol).info
+            return info.get("shortName") or info.get("longName") or None
+        except Exception as e:
+            logger.debug(f"[Yfinance] 获取名称失败 {stock_code} ({yf_symbol}): {e}")
+            return None
+
 
 if __name__ == "__main__":
     # 测试代码
