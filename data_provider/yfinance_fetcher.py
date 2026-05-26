@@ -240,8 +240,10 @@ class YfinanceFetcher(BaseFetcher):
         df = df.reset_index()
 
         # 列名映射（yfinance 使用首字母大写）
+        # 新版 yfinance 对台股（.TW）回传 'Datetime' 而非 'Date' 作为索引名
         column_mapping = {
             'Date': 'date',
+            'Datetime': 'date',
             'Open': 'open',
             'High': 'high',
             'Low': 'low',
