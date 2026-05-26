@@ -239,17 +239,30 @@ class YfinanceFetcher(BaseFetcher):
         # 重置索引，将日期从索引变为列
         df = df.reset_index()
 
-        # 列名映射（yfinance 使用首字母大写）
-        # 新版 yfinance 对台股（.TW）回传 'Datetime' 而非 'Date' 作为索引名
+        # 自动侦测日期列：yfinance 不同版本/市场的索引名不一致
+        # 可能是 'Date'、'Datetime'，或无名索引 reset 后变成 'index'
+        date_col = None
+        for candidate in ('Date', 'Datetime', 'date', 'datetime', 'index'):
+            if candidate in df.columns:
+                if candidate == 'index' and not pd.api.types.is_datetime64_any_dtype(df[candidate]):
+                    continue
+                date_col = candidate
+                break
+        if date_col is None:
+            for col in df.columns:
+                if pd.api.types.is_datetime64_any_dtype(df[col]):
+                    date_col = col
+                    break
+
         column_mapping = {
-            'Date': 'date',
-            'Datetime': 'date',
             'Open': 'open',
             'High': 'high',
             'Low': 'low',
             'Close': 'close',
             'Volume': 'volume',
         }
+        if date_col and date_col != 'date':
+            column_mapping[date_col] = 'date'
 
         df = df.rename(columns=column_mapping)
 
