@@ -869,6 +869,104 @@ class YfinanceFetcher(BaseFetcher):
             logger.debug(f"[Yfinance] 获取名称失败 {stock_code} ({yf_symbol}): {e}")
             return None
 
+    def get_tw_fundamental(self, stock_code: str) -> Dict[str, Any]:
+        """
+        通过 yfinance Ticker.info 获取台股基本面数据。
+
+        返回与 get_fundamental_context 兼容的结构：
+        valuation / earnings / growth 三个 block。
+        """
+        import yfinance as yf
+
+        yf_symbol = self._convert_stock_code(stock_code)
+        try:
+            info = yf.Ticker(yf_symbol).info
+        except Exception as e:
+            logger.warning(f"[Yfinance] 台股基本面获取失败 {stock_code}: {e}")
+            return {"status": "failed", "errors": [str(e)]}
+
+        def _safe(key: str):
+            v = info.get(key)
+            if v is None:
+                return None
+            try:
+                return float(v)
+            except (TypeError, ValueError):
+                return None
+
+        price = _safe("currentPrice") or _safe("previousClose")
+        pe = _safe("trailingPE")
+        forward_pe = _safe("forwardPE")
+        pb = _safe("priceToBook")
+        market_cap = _safe("marketCap")
+        eps = _safe("trailingEps")
+        forward_eps = _safe("forwardEps")
+        revenue = _safe("totalRevenue")
+        net_income = _safe("netIncomeToCommon")
+        operating_cf = _safe("operatingCashflow")
+        roe = _safe("returnOnEquity")
+        dividend_rate = _safe("dividendRate")
+        dividend_yield = _safe("dividendYield")
+        trailing_div_rate = _safe("trailingAnnualDividendRate")
+        trailing_div_yield = _safe("trailingAnnualDividendYield")
+        payout_ratio = _safe("payoutRatio")
+
+        def _fmt_amount(v):
+            if v is None:
+                return "N/A"
+            abs_v = abs(v)
+            sign = "-" if v < 0 else ""
+            if abs_v >= 1e12:
+                return f"{sign}{abs_v / 1e12:.2f}兆"
+            if abs_v >= 1e8:
+                return f"{sign}{abs_v / 1e8:.2f}億"
+            if abs_v >= 1e4:
+                return f"{sign}{abs_v / 1e4:.2f}萬"
+            return f"{sign}{abs_v:.2f}"
+
+        valuation_data = {
+            "pe_ratio": round(pe, 2) if pe else None,
+            "forward_pe": round(forward_pe, 2) if forward_pe else None,
+            "pb_ratio": round(pb, 2) if pb else None,
+            "total_mv": market_cap,
+            "eps": round(eps, 2) if eps else None,
+        }
+
+        financial_report = {
+            "revenue": _fmt_amount(revenue),
+            "net_profit_parent": _fmt_amount(net_income),
+            "operating_cash_flow": _fmt_amount(operating_cf),
+            "roe": f"{round(roe * 100, 2)}%" if roe else "N/A",
+            "report_date": "TTM (yfinance)",
+        }
+
+        ttm_cash = trailing_div_rate
+        ttm_yield_pct = round(trailing_div_yield * 100, 2) if trailing_div_yield else None
+        if ttm_yield_pct is None and ttm_cash and price and price > 0:
+            ttm_yield_pct = round(ttm_cash / price * 100, 2)
+
+        dividend_data = {
+            "ttm_cash_dividend_per_share": ttm_cash,
+            "ttm_dividend_yield_pct": ttm_yield_pct,
+            "ttm_event_count": "N/A",
+            "payout_ratio": f"{round(payout_ratio * 100, 1)}%" if payout_ratio else "N/A",
+        }
+
+        earnings_data = {
+            "financial_report": financial_report,
+            "dividend": dividend_data,
+        }
+
+        growth_data = {}
+        if eps and forward_eps:
+            growth_data["eps_growth_est"] = f"{round((forward_eps / eps - 1) * 100, 1)}%"
+
+        return {
+            "valuation": valuation_data,
+            "earnings": {"data": earnings_data},
+            "growth": growth_data,
+        }
+
 
 if __name__ == "__main__":
     # 测试代码

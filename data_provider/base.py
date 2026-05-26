@@ -2138,6 +2138,65 @@ class DataFetcherManager:
             **blocks,
         }
 
+    def _get_tw_fundamental_context(self, stock_code: str) -> Dict[str, Any]:
+        """
+        台股基本面：委托 YfinanceFetcher.get_tw_fundamental()，
+        将结果转换为 get_fundamental_context 兼容的标准结构。
+        """
+        start_ts = time.time()
+        source_entry = {"provider": "yfinance_tw_fundamental", "result": "failed", "duration_ms": 0}
+        yf_fetcher = None
+        for f in self._fetchers:
+            if f.__class__.__name__ == "YfinanceFetcher":
+                yf_fetcher = f
+                break
+
+        if yf_fetcher is None:
+            return self._build_market_not_supported(market="tw", reason="YfinanceFetcher not available")
+
+        try:
+            raw = yf_fetcher.get_tw_fundamental(stock_code)
+        except Exception as e:
+            logger.warning(f"[台股基本面] {stock_code} yfinance 获取失败: {e}")
+            return self._build_market_not_supported(market="tw", reason=str(e))
+
+        elapsed_ms = int((time.time() - start_ts) * 1000)
+        source_entry["duration_ms"] = elapsed_ms
+
+        if raw.get("status") == "failed":
+            source_entry["result"] = "failed"
+            return self._build_market_not_supported(market="tw", reason=raw.get("errors", ["unknown"])[0])
+
+        source_entry["result"] = "partial"
+        chain = [source_entry]
+
+        valuation_data = raw.get("valuation", {})
+        earnings_raw = raw.get("earnings", {})
+        growth_data = raw.get("growth", {})
+
+        valuation_status = "partial" if self._has_meaningful_payload(valuation_data) else "not_supported"
+        earnings_status = "partial" if self._has_meaningful_payload(earnings_raw.get("data")) else "not_supported"
+        growth_status = "partial" if self._has_meaningful_payload(growth_data) else "not_supported"
+
+        blocks = {
+            "valuation": self._build_fundamental_block(valuation_status, valuation_data, chain, []),
+            "growth": self._build_fundamental_block(growth_status, growth_data, chain, []),
+            "earnings": self._build_fundamental_block(earnings_status, earnings_raw.get("data", {}), chain, []),
+            "institution": self._build_fundamental_block("not_supported", {}, chain, ["tw market"]),
+            "capital_flow": self._build_fundamental_block("not_supported", {}, chain, ["tw market"]),
+            "dragon_tiger": self._build_fundamental_block("not_supported", {}, chain, ["tw market"]),
+            "boards": self._build_fundamental_block("not_supported", {}, chain, ["tw market"]),
+        }
+
+        return {
+            "market": "tw",
+            "status": "partial",
+            "coverage": {block: blocks[block]["status"] for block in blocks},
+            "source_chain": chain,
+            "errors": [],
+            **blocks,
+        }
+
     def build_failed_fundamental_context(self, stock_code: str, reason: str) -> Dict[str, Any]:
         """Build a consistent failed-context payload for caller-side fallback."""
         market = _market_tag(stock_code)
@@ -2193,6 +2252,9 @@ class DataFetcherManager:
                 market=market,
                 reason="market not supported",
             )
+
+        if market == "tw":
+            return self._get_tw_fundamental_context(stock_code)
 
         stage_timeout = float(
             budget_seconds if budget_seconds is not None else config.fundamental_stage_timeout_seconds
