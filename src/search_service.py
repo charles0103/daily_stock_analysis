@@ -3168,24 +3168,74 @@ class SearchService:
         return self._dedup_intel_results(results)
 
     @staticmethod
-    def _intel_dedup_key(result: "SearchResult") -> str:
-        """为情报结果生成跨维度去重键：优先用规范化 URL，其次标题+来源。"""
+    def _intel_url_key(result: "SearchResult") -> Optional[str]:
+        """生成规范化 URL 去重键；无 URL 时返回 None。"""
         url = (result.url or "").strip()
-        if url:
-            parsed = urlparse(url.lower())
-            netloc = parsed.netloc
-            path = parsed.path.rstrip("/")
-            return f"{netloc}{path}?{parsed.query}" if parsed.query else f"{netloc}{path}"
+        if not url:
+            return None
+        parsed = urlparse(url.lower())
+        netloc = parsed.netloc
+        path = parsed.path.rstrip("/")
+        return f"{netloc}{path}?{parsed.query}" if parsed.query else f"{netloc}{path}"
+
+    @staticmethod
+    def _intel_title_key(result: "SearchResult") -> Optional[str]:
+        """生成规范化标题去重键：去除空白与标点并归一大小写，
+        以捕捉同一新闻被不同来源转载（URL 不同但标题相同）的重复。
+        无标题时返回 None。"""
         title = (result.title or "").strip().lower()
-        source = (result.source or "").strip().lower()
-        return f"title::{title}::{source}"
+        if not title:
+            return None
+        # \w 在 Python3 默认匹配 Unicode（含中日韩），故 [\s\W_]+ 会去掉
+        # 空白与标点但保留中英文与数字，避免标点差异导致漏判。
+        normalized = re.sub(r"[\s\W_]+", "", title, flags=re.UNICODE)
+        return f"title::{normalized}" if normalized else None
+
+    @classmethod
+    def _is_duplicate_result(
+        cls,
+        result: "SearchResult",
+        seen_urls: set,
+        seen_titles: set,
+    ) -> bool:
+        """根据已见 URL/标题集合判断是否重复；非重复则登记其键后返回 False。
+
+        URL 相同或规范化标题相同任一命中即视为重复，可同时覆盖
+        「同 URL」与「同新闻异 URL」两类重复。
+        """
+        url_key = cls._intel_url_key(result)
+        title_key = cls._intel_title_key(result)
+        if (url_key and url_key in seen_urls) or (title_key and title_key in seen_titles):
+            return True
+        if url_key:
+            seen_urls.add(url_key)
+        if title_key:
+            seen_titles.add(title_key)
+        return False
+
+    @classmethod
+    def dedup_search_results(
+        cls, results: List["SearchResult"]
+    ) -> List["SearchResult"]:
+        """对一组搜索结果按 URL/标题去重，保留先出现者。
+
+        供大盘新闻等「多 query 聚合」场景复用，与个股跨维度去重共用同一判定逻辑。
+        """
+        seen_urls: set = set()
+        seen_titles: set = set()
+        return [
+            item
+            for item in results
+            if item is not None and not cls._is_duplicate_result(item, seen_urls, seen_titles)
+        ]
 
     @classmethod
     def _dedup_intel_results(
         cls, results: Dict[str, "SearchResponse"]
     ) -> Dict[str, "SearchResponse"]:
         """跨维度去重，保留首个出现该新闻的维度；不修改原响应对象。"""
-        seen_keys: set[str] = set()
+        seen_urls: set = set()
+        seen_titles: set = set()
         deduped: Dict[str, SearchResponse] = {}
 
         for dim_name, response in results.items():
@@ -3193,13 +3243,11 @@ class SearchService:
                 deduped[dim_name] = response
                 continue
 
-            unique_results: List[SearchResult] = []
-            for item in response.results:
-                key = cls._intel_dedup_key(item)
-                if key in seen_keys:
-                    continue
-                seen_keys.add(key)
-                unique_results.append(item)
+            unique_results: List[SearchResult] = [
+                item
+                for item in response.results
+                if not cls._is_duplicate_result(item, seen_urls, seen_titles)
+            ]
 
             deduped[dim_name] = replace(response, results=unique_results)
 

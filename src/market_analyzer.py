@@ -431,12 +431,21 @@ Focus on index trend, liquidity, and sector rotation to shape the next-session t
                 if response and response.results:
                     all_news.extend(response.results)
                     logger.info(f"[大盘] 搜索 '{query}' 获取 {len(response.results)} 条结果")
-            
-            logger.info(f"[大盘] 共获取 {len(all_news)} 条市场新闻")
-            
+
+            # 多组 query 主题高度重叠（如「美股 大盘」/「US stock market」/「S&P 500 NASDAQ」），
+            # 常命中同一篇新闻；聚合后去重，避免重复喂给 LLM 及在复盘报告中重复呈现。
+            raw_count = len(all_news)
+            all_news = self.search_service.dedup_search_results(all_news)
+            if len(all_news) != raw_count:
+                logger.info(
+                    f"[大盘] 市场新闻去重: {raw_count} 条 → {len(all_news)} 条"
+                )
+            else:
+                logger.info(f"[大盘] 共获取 {len(all_news)} 条市场新闻")
+
         except Exception as e:
             logger.error(f"[大盘] 搜索市场新闻失败: {e}")
-        
+
         return all_news
     
     def generate_market_review(self, overview: MarketOverview, news: List) -> str:

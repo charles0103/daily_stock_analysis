@@ -463,6 +463,73 @@ class SearchNewsFreshnessTestCase(unittest.TestCase):
             [unique.url],
         )
 
+    def test_search_comprehensive_intel_dedups_same_news_different_url(self) -> None:
+        """同一篇新闻被不同来源转载（标题相同、URL 不同）时也应去重。"""
+        fresh_dt = datetime.now(timezone.utc).replace(microsecond=0)
+        fresh_text = fresh_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+        original = SearchResult(
+            title="華碩 Q1 營收創新高",
+            snippet="snippet",
+            url="https://a.example.com/news/1",
+            source="A媒体",
+            published_date=fresh_text,
+        )
+        # 标点/空白差异 + 不同站点转载，规范化标题相同 → 视为重复
+        reposted = SearchResult(
+            title="華碩 Q1 營收，創新高！",
+            snippet="snippet",
+            url="https://b.example.com/news/2",
+            source="B媒体",
+            published_date=None,
+        )
+        unique = SearchResult(
+            title="華碩 法說會展望",
+            snippet="snippet",
+            url="https://c.example.com/news/3",
+            source="C媒体",
+            published_date=None,
+        )
+
+        service, mock_search = self._create_service_with_mock_provider(
+            news_max_age_days=3,
+            news_strategy_profile="short",
+        )
+        mock_search.side_effect = [
+            _response([original]),
+            _response([reposted, unique]),
+        ]
+
+        with patch("src.search_service.time.sleep"):
+            intel = service.search_comprehensive_intel(
+                stock_code="TW2357",
+                stock_name="華碩",
+                max_searches=2,
+            )
+
+        self.assertEqual(
+            [item.url for item in intel["latest_news"].results], [original.url]
+        )
+        self.assertEqual(
+            [item.url for item in intel["market_analysis"].results],
+            [unique.url],
+        )
+
+    def test_dedup_search_results_dedups_by_url_and_title(self) -> None:
+        """dedup_search_results 供大盘新闻等聚合场景复用：按 URL/标题去重并保留先出现者。"""
+        a = SearchResult(title="美股收高", snippet="s", url="https://x.com/a", source="X")
+        a_same_url = SearchResult(
+            title="标题不同但同链接", snippet="s", url="https://x.com/a/", source="X"
+        )
+        a_same_title = SearchResult(
+            title="美股，收高", snippet="s", url="https://y.com/b", source="Y"
+        )
+        b = SearchResult(title="纳指走势", snippet="s", url="https://z.com/c", source="Z")
+
+        deduped = SearchService.dedup_search_results([a, a_same_url, a_same_title, b])
+
+        self.assertEqual([item.url for item in deduped], [a.url, b.url])
+
     def test_announcements_dimension_included_within_max_searches_5(self) -> None:
         """announcements is now at index 3 so it is processed when max_searches>=4."""
         fresh_dt = datetime.now(timezone.utc).replace(microsecond=0)
