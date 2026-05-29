@@ -412,6 +412,57 @@ class SearchNewsFreshnessTestCase(unittest.TestCase):
         self.assertIsNone(intel["market_analysis"].results[0].published_date)
         self.assertEqual(intel["risk_check"].results, [])
 
+    def test_search_comprehensive_intel_dedups_across_dimensions(self) -> None:
+        """同一篇新闻被多个维度命中时，应只保留首个出现的维度。"""
+        fresh_dt = datetime.now(timezone.utc).replace(microsecond=0)
+        fresh_text = fresh_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+        shared = SearchResult(
+            title="shared headline",
+            snippet="snippet",
+            url="https://news.example.com/article/123",
+            source="example.com",
+            published_date=fresh_text,
+        )
+        # 同一 URL 末尾带斜杠 + 不同标题，仍应被视为重复
+        shared_dup = SearchResult(
+            title="different title same link",
+            snippet="snippet",
+            url="https://news.example.com/article/123/",
+            source="example.com",
+            published_date=None,
+        )
+        unique = SearchResult(
+            title="unique analysis",
+            snippet="snippet",
+            url="https://news.example.com/article/456",
+            source="example.com",
+            published_date=None,
+        )
+
+        service, mock_search = self._create_service_with_mock_provider(
+            news_max_age_days=3,
+            news_strategy_profile="short",
+        )
+        mock_search.side_effect = [
+            _response([shared]),
+            _response([shared_dup, unique]),
+        ]
+
+        with patch("src.search_service.time.sleep"):
+            intel = service.search_comprehensive_intel(
+                stock_code="600519",
+                stock_name="贵州茅台",
+                max_searches=2,
+            )
+
+        self.assertEqual([item.url for item in intel["latest_news"].results], [shared.url])
+        # market_analysis 中与 latest_news 重复的项被剔除，仅保留唯一项
+        self.assertEqual(
+            [item.url for item in intel["market_analysis"].results],
+            [unique.url],
+        )
+
     def test_announcements_dimension_included_within_max_searches_5(self) -> None:
         """announcements is now at index 3 so it is processed when max_searches>=4."""
         fresh_dt = datetime.now(timezone.utc).replace(microsecond=0)

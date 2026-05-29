@@ -1035,7 +1035,7 @@ class DatabaseManager:
                 f"save_news_intel[{code}]",
                 _write,
             )
-            logger.info(f"保存新闻情报成功: {code}, 新增 {saved_count} 条")
+            logger.info(f"保存新闻情报成功: {code} [{dimension}], 新增 {saved_count} 条")
         except Exception as e:
             logger.error(f"保存新闻情报失败: {e}")
             raise

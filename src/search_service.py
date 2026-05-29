@@ -16,7 +16,7 @@ import re
 import threading
 import time
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
 from typing import List, Dict, Any, Optional, Tuple
@@ -3161,9 +3161,50 @@ class SearchService:
             
             # 短暂延迟避免请求过快
             time.sleep(0.5)
-        
-        return results
-    
+
+        # 跨维度去重：同一篇新闻可能被多个维度的查询命中，
+        # 若不去重会在报告与喂给 LLM 的上下文中重复出现。
+        # 按搜索/插入顺序遍历，先出现的维度保留该结果，后续维度剔除重复项。
+        return self._dedup_intel_results(results)
+
+    @staticmethod
+    def _intel_dedup_key(result: "SearchResult") -> str:
+        """为情报结果生成跨维度去重键：优先用规范化 URL，其次标题+来源。"""
+        url = (result.url or "").strip()
+        if url:
+            parsed = urlparse(url.lower())
+            netloc = parsed.netloc
+            path = parsed.path.rstrip("/")
+            return f"{netloc}{path}?{parsed.query}" if parsed.query else f"{netloc}{path}"
+        title = (result.title or "").strip().lower()
+        source = (result.source or "").strip().lower()
+        return f"title::{title}::{source}"
+
+    @classmethod
+    def _dedup_intel_results(
+        cls, results: Dict[str, "SearchResponse"]
+    ) -> Dict[str, "SearchResponse"]:
+        """跨维度去重，保留首个出现该新闻的维度；不修改原响应对象。"""
+        seen_keys: set[str] = set()
+        deduped: Dict[str, SearchResponse] = {}
+
+        for dim_name, response in results.items():
+            if not response or not response.success or not response.results:
+                deduped[dim_name] = response
+                continue
+
+            unique_results: List[SearchResult] = []
+            for item in response.results:
+                key = cls._intel_dedup_key(item)
+                if key in seen_keys:
+                    continue
+                seen_keys.add(key)
+                unique_results.append(item)
+
+            deduped[dim_name] = replace(response, results=unique_results)
+
+        return deduped
+
     def format_intel_report(self, intel_results: Dict[str, SearchResponse], stock_name: str) -> str:
         """
         格式化情报搜索结果为报告
